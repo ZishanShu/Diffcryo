@@ -1,0 +1,44 @@
+batch_size: 64
+ch_mults:
+- 1
+- 2
+- 2
+- 4
+data_dir: dataset/data/
+debug: false
+dropout: 0.1
+dset_name: qm9
+elements:
+- C
+- H
+- O
+- N
+- F
+exp_dir: exps/
+exp_name: exp_qm9_sig0.9_lr2e-05
+grid_dim: 32
+is_attn:
+- false
+- false
+- true
+- true
+lr: 2.0e-05
+max_steps_wjs: 1000
+model_config: models/configs/unet3d_config.yml
+model_name: unet3d
+n_blocks: 2
+n_chains: 50
+n_channels: 32
+n_groups: 16
+num_channels: 5
+num_epochs: 500
+num_workers: 8
+output_dir: exps/exp_qm9_sig0.9_lr2e-05
+repeats_wjs: 5
+resume: null
+seed: 42
+smooth_sigma: 0.9
+steps_wjs: 500
+wandb: 0
+warmup_wjs: 0
+wd: 0.01
