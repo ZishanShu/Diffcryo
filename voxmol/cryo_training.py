@@ -18,6 +18,15 @@ class ConditionalDiffusion(nn.Module):
         super(ConditionalDiffusion, self).__init__()
         self.timesteps = timesteps
         
+        # 初始化 beta 序列，通常是从较小值到较大值的线性或平方等变化
+        betas = torch.linspace(0.0001, 0.02, timesteps, device='cuda')
+        
+        # 计算 alpha 和 alphas_cumprod
+        alphas = 1.0 - betas  # 每个时间步的 alpha 值
+        self.alphas_cumprod = torch.cumprod(alphas, dim=0)  # 累积乘积
+        self.alphas_cumprod_prev = torch.cat([torch.tensor([1.0], device='cuda'), self.alphas_cumprod[:-1]])  # 前一个累乘值
+
+        
         # 编码器
         self.encoder = nn.Sequential(
             nn.Conv3d(66, 16, kernel_size=3, padding=1),  # 现在接受3个通道 (2 for protein + atom + 1 for time embedding)
@@ -70,11 +79,22 @@ class ConditionalDiffusion(nn.Module):
         return preds
 
     def add_noise(self, x, t):
-        """根据时间步 t 向输入 x 添加噪声"""
-        noise = torch.randn_like(x)  # 生成与 x 形状相同的噪声
-        t = t.view(-1, 1, 1, 1, 1)  # 将 t 扩展为与 x 兼容的形状
-        return x * (1 - t / self.timesteps) + noise * (t / self.timesteps)
-    
+        """向输入 x 添加噪声，根据时间步 t 调整噪声的比例"""
+        # 生成与 x 形状相同的随机噪声
+        noise = torch.randn_like(x)
+
+        # 确保 t 是整数类型
+        t = t.long()  # 转换 t 为长整型
+
+        # 获取 alpha_t 的值并调整形状以进行广播
+        alpha_t = self.alphas_cumprod[t]  # 累乘的 alpha 值
+        sqrt_alpha_t = torch.sqrt(alpha_t).view(-1, 1, 1, 1, 1)  # 调整形状为 (batch_size, 1, 1, 1, 1)
+        sqrt_one_minus_alpha_t = torch.sqrt(1 - alpha_t).view(-1, 1, 1, 1, 1)  # 调整形状为 (batch_size, 1, 1, 1, 1)
+
+        # 加噪声
+        noisy_x = sqrt_alpha_t * x + sqrt_one_minus_alpha_t * noise
+        return noisy_x
+
     def remove_noise(self, x, t, condition):
         """去除噪声，生成干净的输出"""
         return self.forward(x, t, condition)
@@ -87,7 +107,6 @@ class ConditionalDiffusion(nn.Module):
         denoised_x = self.remove_noise(noisy_x, t, condition)
         return denoised_x
     
-
 def main():
     # ----------------------
     # basic inits
@@ -118,7 +137,7 @@ def main():
     #     num_channels=len(config["elements"]),
     #     device=device,
     # )
-    model = create_model(config)
+    model = ConditionalDiffusion().to('cuda')
     
     if torch.cuda.device_count() > 1:
         model = torch.nn.DataParallel(model)
@@ -215,11 +234,9 @@ def train(
     metrics.reset()
     model.train()
     
-    # 初始化模型
-    model = ConditionalDiffusion().to('cuda')
     
     for i, (protein, atom) in enumerate(loader):
-        t = torch.randint(0, model.timesteps, (atom.size(0),), device='cuda').float()
+        t = torch.randint(0, model.module.timesteps, (atom.size(0),), device='cuda').float()
         protein = protein.unsqueeze(1)
         atom = atom.unsqueeze(1)
         
@@ -227,10 +244,10 @@ def train(
         atom = atom.to('cuda')
         
         # forward/backward
-        output = model.diffusion_step(atom, t, protein) # (batch_size, 4, 32, 32, 32)
+        output = model.module.diffusion_step(atom, t, protein) # (batch_size, 4, 32, 32, 32)
         # print(f"Output shape: {output.shape}, range: ({output.min().item()}, {output.max().item()})")
         
-        preds = model.post_process_output(output) # (batch_size, 32, 32, 32)
+        preds = model.module.post_process_output(output) # (batch_size, 32, 32, 32)
         
         loss = criterion(output, atom.squeeze(1).long())  # 直接使用atom作为真实值
         loss.backward()
@@ -273,12 +290,10 @@ def val(
     """
     metrics.reset()
     model.eval()
-    
-    model = ConditionalDiffusion().to('cuda')
 
     with torch.no_grad():
         for i, (protein, atom) in enumerate(loader):
-            t = torch.randint(0, model.timesteps, (atom.size(0),), device='cuda').float()
+            t = torch.randint(0, model.module.timesteps, (atom.size(0),), device='cuda').float()
             # voxelize
             # voxels = voxelizer(batch)
             protein = protein.unsqueeze(1) # [batch_size, 1, 32, 32, 32]
@@ -288,8 +303,8 @@ def val(
             atom = atom.to('cuda')
             
             # forward
-            output = model.diffusion_step(atom, t, protein)
-            preds = model.post_process_output(output) # (batch_size, 32, 32, 32)
+            output = model.module.diffusion_step(atom, t, protein)
+            preds = model.module.post_process_output(output) # (batch_size, 32, 32, 32)
 
             loss = criterion(output, atom.squeeze(1).long())  # 直接使用atom作为真实值
 
