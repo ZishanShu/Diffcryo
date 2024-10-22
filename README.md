@@ -1,6 +1,6 @@
 # Diffcryo
 
-![image.png](Diffcryo/image/image.png)
+![image.png](image/image.png)
 
 # Install
 
@@ -56,7 +56,7 @@ download_data/get_resample_map.py（通过`vol resample #1 spacing 1.0`，对体
 
 对于后续分布  用了min-max归一化  再映射到【0-1】范围内
 
-![image.png](Diffcryo/image/image1.png)
+![image.png](image/image1.png)
 
 3、分别label atom和amino
 
