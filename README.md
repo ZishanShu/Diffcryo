@@ -1,5 +1,7 @@
 # Diffcryo
 
+![image.png](Diffcryo/image/image.png)
+
 # Install
 
 ```jsx
@@ -54,7 +56,7 @@ download_data/get_resample_map.py（通过`vol resample #1 spacing 1.0`，对体
 
 对于后续分布  用了min-max归一化  再映射到【0-1】范围内
 
-![image.png](Diffcryo%20Repo%2011f55c26dd9980c5b98df3c6c25d41d4/image.png)
+![image.png](Diffcryo/image/image1.png)
 
 3、分别label atom和amino
 
@@ -67,7 +69,7 @@ ls valid_sub_grids > valid_splits.txt
 
 生成后面index的.txt
 
-## code
+## Code
 
 下载map数据集的代码：
 
